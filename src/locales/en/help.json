@@ -1,0 +1,225 @@
+{
+  "meta": {
+    "title": "Find a Home in Da Nang | Green Basket Concierge",
+    "description": "Property search by your criteria, online viewings with a local specialist, and support with communication and the rental process in Da Nang."
+  },
+  "navigation": "Green Basket Concierge",
+  "hero": {
+    "eyebrow": "Green Basket Concierge · Da Nang",
+    "title": "Find a home in Da Nang without endless chats or blind trips",
+    "description": "We shortlist homes from our database and open sources to match your criteria. A local specialist visits the property, walks you through it online with a checklist, and helps coordinate conversations with the local side — through one point of contact.",
+    "housingCta": "See options and prices",
+    "assistanceCta": "Need help with something else?",
+    "oneContact": "One point of contact",
+    "remoteViewing": "Online viewing",
+    "imageAlt": "Illustrative apartment interior in Da Nang during a home inspection",
+    "photoLabel": "How the service works",
+    "photoCaption": "We check first — you decide next",
+    "illustration": "Illustrative image"
+  },
+  "benefits": {
+    "title": "How we make the housing search easier",
+    "filtered": { "title": "A focused shortlist", "description": "We search to your criteria instead of forwarding a stream of listings." },
+    "local": { "title": "Local communication", "description": "We communicate with local agents and property owners on site." },
+    "checklist": { "title": "A viewing with checks", "description": "A specialist visits the property, so you do not spend time travelling just for an initial check." }
+  },
+  "pricing": {
+    "eyebrow": "Three clear options",
+    "title": "Choose your search format",
+    "description": "These are our service fees. Rental terms and any additional costs are discussed separately.",
+    "popular": "More viewings",
+    "customPrice": "Custom",
+    "options": {
+      "single": { "title": "One-time search", "description": "From the first shortlist to your decision on a property." },
+      "package": { "title": "Search package", "description": "More options to compare with confidence." },
+      "custom": { "title": "Custom format", "description": "For specific requirements or a different scope." }
+    },
+    "features": {
+      "search": "Search our database and open sources against your criteria",
+      "viewing": "Arrange one online viewing",
+      "checklist": "An on-site visit and a property checklist",
+      "deal": "If you choose a property, support through the rental transaction",
+      "everythingSingle": "Everything included in the one-time search",
+      "extraViewings": "9 additional online viewings",
+      "contract": "Review of the deposit and maintenance terms, with suggested edits",
+      "customScope": "A tailored number of searches and viewings",
+      "confirmTerms": "Scope and fee confirmed before work begins"
+    },
+    "requestCta": "Get a consultation",
+    "noPayment": "No payment on this page",
+    "priceUnavailable": "Price details are confirmed in consultation.",
+    "perProperty": "per property",
+    "packageNote": "We will clarify the package details when you contact us.",
+    "assistanceNote": "The price depends on the task scope and is agreed before work begins."
+  },
+  "form": {
+    "title": "Get a consultation",
+    "description": "Leave your name and a convenient way to reach you. A manager will clarify your criteria and discuss the selected option.",
+    "selectedLabel": "Your selection",
+    "stepLabel": "Next step",
+    "name": "What should we call you?",
+    "contactMethod": "Where should we contact you?",
+    "contactValue": "Contact details",
+    "contactExamples": {
+      "telegram": "Example: @your_username",
+      "whatsapp": "Example: +84 90 123 4567",
+      "zalo": "Example: +84 90 123 4567",
+      "email": "Example: you@example.com"
+    },
+    "preferredLanguage": "Preferred consultation language",
+    "languageOther": "Please name the language",
+    "optionalNote": "Add a note (optional)",
+    "descriptionHint": "Briefly share anything we should know. You can discuss the details with the manager.",
+    "privacy": "I agree to the processing of the details in this request so the team can contact me.",
+    "privacyMissing": "An approved privacy policy and retention period need to be added before commercial launch.",
+    "singleProperty": "One-time property search",
+    "package": "Search package",
+    "discuss": "Custom format",
+    "submit": "Send my contact details",
+    "sending": "Sending…",
+    "successTitle": "Request received",
+    "successText": "A manager will contact you using the details provided to discuss your request and the terms.",
+    "requestNumber": "Request number",
+    "sendAnother": "Send another request",
+    "errorTitle": "We could not save the request",
+    "retry": "Try again",
+    "newIdempotency": "Start a new request",
+    "errors": {
+      "required": "Please complete this field.",
+      "invalid": "Please check this value.",
+      "too_long": "This value is too long.",
+      "must_confirm": "Please confirm consent to process the request.",
+      "date_in_past": "Choose today or a future date in Da Nang.",
+      "rate_limited": "Too many requests. Please try again later.",
+      "payload_too_large": "The request is too large.",
+      "idempotency_conflict": "This request key was already used for different data. Start a new request.",
+      "invalid_session": "The signed-in session is no longer valid. Please sign in again or continue as a guest.",
+      "internal_error": "The request was not saved. Please try again."
+    },
+    "stayDuration": "Length of stay",
+    "stay": {
+      "threeToSix": "3 to 6 months",
+      "overSix": "More than 6 months",
+      "livingHere": "I already live here",
+      "other": "Other",
+      "notSpecified": "Not specified"
+    }
+  },
+  "comparison": {
+    "eyebrow": "Why work with a specialist",
+    "title": "What guided search changes",
+    "description": "Compare searching Facebook and group chats yourself with support from a Concierge specialist.",
+    "rowHeading": "Step",
+    "sources": {
+      "facebook": "Facebook and group chats",
+      "concierge": "Concierge specialist"
+    },
+    "rows": {
+      "search": "Search and shortlist",
+      "communication": "Communication",
+      "viewing": "Viewing",
+      "agreement": "Agreement and transaction"
+    },
+    "cells": {
+      "facebook": {
+        "search": "Many listings and duplicates; you filter the options yourself.",
+        "communication": "Separate conversations with different posters and agents.",
+        "viewing": "Arrange viewings and check the property yourself.",
+        "agreement": "Discuss the terms and work through the agreement yourself."
+      },
+      "concierge": {
+        "search": "Search against your criteria in our database and open sources.",
+        "communication": "One contact coordinates conversations with local agents and owners in Vietnamese.",
+        "viewing": "A specialist visits, conducts an online viewing, and completes a checklist.",
+        "agreement": "The package includes contract review, suggested edits, and transaction support."
+      }
+    }
+  },
+  "inspection": {
+    "eyebrow": "On-site viewing",
+    "title": "We check beyond the listing details",
+    "description": "During a visit, the specialist pays attention to everyday details that are hard to assess from photos or messages.",
+    "photoAlt": "A specialist inspecting an apartment and checking the air conditioner",
+    "photoCaption": "A careful look before you make a decision",
+    "checks": {
+      "condition": "Signs of damp or mold, and unusual odors",
+      "noise": "Check whether karaoke bars, construction, or a major road are nearby",
+      "access": "Whether the access road to the home is wide enough",
+      "amenities": "Nearby shops and everyday amenities",
+      "airConditioning": "The condition and cleanliness of the air conditioners",
+      "landlordAndAgreement": "Communication with the landlord and clarity of the rental agreement terms"
+    }
+  },
+  "realtor": {
+    "eyebrow": "Local experience",
+    "name": "Dao Nguyen",
+    "photoAlt": "Professional portrait of realtor Dao Nguyen",
+    "title": "A certified realtor with local experience who speaks Vietnamese",
+    "description": "An experienced certified realtor with an extensive property database, attentive to your criteria and the details of a rental.",
+    "databaseTitle": "A broad database and direct contacts",
+    "databaseDescription": "We search our database and open sources, including Facebook and Chợ Tốt, and work directly with property owners.",
+    "viewingTitle": "On-site property checks",
+    "viewingDescription": "A trained specialist visits the property, communicates in Vietnamese, and records key details in a checklist.",
+    "noGuarantee": "We cannot promise the perfect home on the first viewing. We can take much of the search, local communication, and coordination off your hands."
+  },
+  "process": {
+    "eyebrow": "A clear path",
+    "title": "From request to decision",
+    "steps": {
+      "one": { "title": "Choose an option", "description": "Leave your contact details and tell us which format you are considering." },
+      "two": { "title": "Discuss the terms", "description": "A manager clarifies your criteria, scope, and terms before work begins." },
+      "three": { "title": "View and decide", "description": "A specialist arranges online viewings and shares a checklist. The rental decision stays with you." }
+    }
+  },
+  "otherConcierge": {
+    "eyebrow": "Other tasks in Da Nang",
+    "title": "Need help beyond finding a home?",
+    "description": "Describe the task. We will confirm whether we can help, what it involves, and how much it will cost.",
+    "examples": "For example: arranging a doctor visit, finding a product, or coordinating a purchase or delivery.",
+    "cta": "Describe another task"
+  },
+  "languages": { "english": "English", "russian": "Russian", "vietnamese": "Vietnamese", "other": "Other" },
+  "contactMethods": { "telegram": "Telegram", "whatsapp": "WhatsApp", "zalo": "Zalo", "email": "Email" },
+  "services": { "assistance": { "online": "Online", "offline": "In person in Da Nang", "undecided": "To be discussed" } },
+  "admin": {
+    "title": "Help Service requests",
+    "description": "Review incoming requests. Dates are shown in Da Nang time.",
+    "open": "Help Service",
+    "serviceFilter": "Service",
+    "statusFilter": "Status",
+    "all": "All",
+    "refresh": "Refresh",
+    "loading": "Loading requests…",
+    "empty": "No requests match these filters.",
+    "error": "Could not load Help Service requests.",
+    "retry": "Retry",
+    "name": "Name",
+    "format": "Format / indicative price",
+    "status": "Status",
+    "contact": "Contact",
+    "details": "Request details",
+    "note": "Internal note",
+    "save": "Save changes",
+    "saving": "Saving…",
+    "notAgreed": "Indicative only; not an agreed price.",
+    "conflict": "Another admin changed this request. Refresh before saving.",
+    "statuses": { "new": "New", "contacted": "Contacted", "in_progress": "In progress", "completed": "Completed", "cancelled": "Cancelled" },
+    "serviceTypes": { "housing": "Housing search", "assistance": "Other request" },
+    "accessDenied": "You do not have permission to view this page.",
+    "previous": "Previous",
+    "next": "Next",
+    "page": "Page {{page}} of {{pages}}",
+    "created": "Created",
+    "descriptionLabel": "Customer note",
+    "noDescription": "No additional note provided.",
+    "copy": "Copy contact",
+    "copied": "Copied",
+    "loginDescription": "Sign in with your Concierge administrator account.",
+    "email": "Email",
+    "password": "Password",
+    "signIn": "Sign in",
+    "signOut": "Sign out",
+    "loginFailed": "Sign in failed. Check your email and password.",
+    "saved": "Changes saved."
+  }
+}

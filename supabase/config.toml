@@ -1,0 +1,4 @@
+project_id = "green-basket-concierge"
+
+[functions.create-help-service-request]
+verify_jwt = false
