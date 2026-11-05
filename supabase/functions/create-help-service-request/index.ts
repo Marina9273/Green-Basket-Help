@@ -305,11 +305,155 @@ const getExistingReceipt = async (adminClient: ReturnType<typeof createClient>, 
   return data;
 };
 
+type NotificationRequest = {
+  service_type: "housing" | "assistance";
+  customer_name: string;
+  contact_method: "telegram" | "whatsapp" | "zalo" | "email";
+  contact_value: string;
+  preferred_language: string;
+  language_other: string | null;
+  stay_duration: string;
+  stay_other: string | null;
+  description: string | null;
+  details: unknown;
+  locale: "en" | "ru";
+  indicative_price_vnd: number | null;
+};
+
+const buildAdminNotification = (request: NotificationRequest, requestId: string) => {
+  const isRu = request.locale === "ru";
+  const labels = isRu
+    ? {
+      service: { housing: "Подбор жилья", assistance: "Другая помощь" },
+      name: "Имя",
+      contact: "Контакт для ответа",
+      preferredLanguage: "Язык общения",
+      stay: "Срок проживания",
+      price: "Ориентир стоимости",
+      plan: "Формат подбора",
+      budget: "Бюджет аренды в месяц",
+      areas: "Районы",
+      moveIn: "Дата заселения",
+      propertyType: "Тип жилья",
+      bedrooms: "Спальни",
+      residents: "Жильцы",
+      pets: "Питомцы",
+      propertyUrl: "Ссылка на объект",
+      category: "Категория запроса",
+      format: "Формат помощи",
+      preferredDate: "Желаемая дата",
+      location: "Место / район",
+      description: "Комментарий клиента",
+      admin: "Открыть заявку",
+      truncated: "Часть текста сокращена; полный запрос — в админ-панели.",
+      values: {
+        contact: { telegram: "Telegram", whatsapp: "WhatsApp", zalo: "Zalo", email: "Email" },
+        language: { english: "Английский", russian: "Русский", vietnamese: "Вьетнамский", other: "Другой" },
+        stay: { three_to_six_months: "3–6 месяцев", over_six_months: "Более 6 месяцев", living_here: "Уже живу в Дананге", other: "Другой срок", not_specified: "Не указано" },
+        plan: { single_property: "Разовый подбор", package: "Пакет подбора", discuss: "Индивидуальный формат" },
+        propertyType: { apartment: "Квартира", house: "Дом", studio: "Студия", other: "Другое", undecided: "Не уточнено" },
+        pets: { yes: "Да", no: "Нет", undecided: "Не уточнено" },
+        category: { household: "Бытовой вопрос", medical: "Медицина", documents: "Документы", business: "Бизнес", legal: "Юридический вопрос", other: "Другое" },
+        format: { online: "Онлайн", offline: "Офлайн", undecided: "Не уточнено" },
+      },
+    }
+    : {
+      service: { housing: "Housing search", assistance: "Other assistance" },
+      name: "Name",
+      contact: "Preferred contact",
+      preferredLanguage: "Preferred language",
+      stay: "Length of stay",
+      price: "Indicative price",
+      plan: "Search option",
+      budget: "Monthly rental budget",
+      areas: "Preferred areas",
+      moveIn: "Move-in date",
+      propertyType: "Property type",
+      bedrooms: "Bedrooms",
+      residents: "Residents",
+      pets: "Pets",
+      propertyUrl: "Property link",
+      category: "Request category",
+      format: "Assistance format",
+      preferredDate: "Preferred date",
+      location: "Location / area",
+      description: "Customer note",
+      admin: "Open request",
+      truncated: "Some text was shortened; see the admin panel for the full request.",
+      values: {
+        contact: { telegram: "Telegram", whatsapp: "WhatsApp", zalo: "Zalo", email: "Email" },
+        language: { english: "English", russian: "Russian", vietnamese: "Vietnamese", other: "Other" },
+        stay: { three_to_six_months: "3–6 months", over_six_months: "More than 6 months", living_here: "Already living in Da Nang", other: "Other", not_specified: "Not specified" },
+        plan: { single_property: "One-time search", package: "Search package", discuss: "Individual format" },
+        propertyType: { apartment: "Apartment", house: "House", studio: "Studio", other: "Other", undecided: "Not specified" },
+        pets: { yes: "Yes", no: "No", undecided: "Not specified" },
+        category: { household: "Household", medical: "Medical", documents: "Documents", business: "Business", legal: "Legal", other: "Other" },
+        format: { online: "Online", offline: "In person", undecided: "To be discussed" },
+      },
+    };
+  const singleLine = (value: unknown) =>
+    typeof value === "string" ? value.replace(/[\r\n\t]+/g, " ").replace(/\s{2,}/g, " ").trim() : "";
+  const multiLine = (value: unknown) =>
+    typeof value === "string" ? value.replace(/\r\n?/g, "\n").replace(/\n{3,}/g, "\n\n").trim() : "";
+  const choice = (value: unknown, options: Record<string, string>) =>
+    typeof value === "string" ? options[value] ?? singleLine(value) : "";
+  const lines = [
+    `🔔 ${isRu ? "Новая заявка" : "New request"}: ${labels.service[request.service_type]}`,
+    `ID: ${requestId}`,
+    `${labels.name}: ${singleLine(request.customer_name)}`,
+    `${labels.contact}: ${choice(request.contact_method, labels.values.contact)} — ${request.contact_method === "telegram" ? `@${singleLine(request.contact_value).replace(/^@/, "")}` : singleLine(request.contact_value)}`,
+    `${labels.preferredLanguage}: ${choice(request.preferred_language, labels.values.language)}${request.preferred_language === "other" && request.language_other ? ` (${singleLine(request.language_other)})` : ""}`,
+    `${labels.stay}: ${choice(request.stay_duration, labels.values.stay)}${request.stay_duration === "other" && request.stay_other ? ` (${singleLine(request.stay_other)})` : ""}`,
+  ];
+
+  if (request.indicative_price_vnd !== null) {
+    const price = new Intl.NumberFormat(isRu ? "ru-RU" : "en-US").format(request.indicative_price_vnd);
+    lines.push(`${labels.price}: ${price} ₫`);
+  }
+
+  const details = isPlainObject(request.details) ? request.details : {};
+  const addDetail = (label: string, value: unknown) => {
+    const normalized = typeof value === "number" ? String(value) : singleLine(value);
+    if (normalized) lines.push(`${label}: ${normalized}`);
+  };
+
+  if (request.service_type === "housing") {
+    addDetail(labels.plan, choice(details.plan, labels.values.plan));
+    if (typeof details.rental_budget_vnd === "number") {
+      addDetail(labels.budget, `${new Intl.NumberFormat(isRu ? "ru-RU" : "en-US").format(details.rental_budget_vnd)} ₫`);
+    }
+    addDetail(labels.areas, details.preferred_areas);
+    addDetail(labels.moveIn, details.move_in_date);
+    addDetail(labels.propertyType, choice(details.property_type, labels.values.propertyType));
+    addDetail(labels.bedrooms, details.bedrooms);
+    addDetail(labels.residents, details.residents);
+    addDetail(labels.pets, choice(details.pets, labels.values.pets));
+    addDetail(labels.propertyUrl, details.property_url);
+  } else {
+    addDetail(labels.category, choice(details.category, labels.values.category));
+    addDetail(labels.format, choice(details.format, labels.values.format));
+    addDetail(labels.preferredDate, details.preferred_date);
+    addDetail(labels.location, details.location);
+  }
+
+  const description = multiLine(request.description);
+  if (description) lines.push(`${labels.description}:\n${description}`);
+
+  const adminUrl = "https://concierge.green-basket.online/admin";
+  const footer = `\n\n${labels.admin}: ${adminUrl}`;
+  const marker = `\n${labels.truncated}`;
+  let body = lines.join("\n");
+  const maxBodyLength = 4096 - footer.length - marker.length;
+  if (body.length > maxBodyLength) {
+    body = `${body.slice(0, maxBodyLength).replace(/\s+$/, "")}${marker}`;
+  }
+
+  return `${body}${footer}`;
+};
+
 const deliverAdminNotification = async (
   adminClient: ReturnType<typeof createClient>,
   requestId: string,
-  serviceType: "housing" | "assistance",
-  locale: "en" | "ru",
 ) => {
   const { data: notification, error: notificationError } = await adminClient
     .from("help_service_notification_outbox")
@@ -319,6 +463,13 @@ const deliverAdminNotification = async (
 
   if (notificationError || !notification) throw notificationError ?? new Error("notification_outbox_missing");
   if (notification.status === "sent") return true;
+
+  const { data: request, error: requestError } = await adminClient
+    .from("help_service_requests")
+    .select("service_type,customer_name,contact_method,contact_value,preferred_language,language_other,stay_duration,stay_other,description,details,locale,indicative_price_vnd")
+    .eq("id", requestId)
+    .maybeSingle();
+  if (requestError || !request) throw requestError ?? new Error("help_service_request_missing");
 
   const botToken = Deno.env.get("TELEGRAM_BOT_TOKEN")?.trim() ?? "";
   const chatId = Deno.env.get("TELEGRAM_ADMIN_CHAT_ID_2_message")?.trim() ?? "";
@@ -369,13 +520,7 @@ const deliverAdminNotification = async (
   if (claimError) throw claimError;
   if (!claimedNotification) return false;
 
-  const serviceLabel = locale === "ru"
-    ? (serviceType === "housing" ? "подбор жилья" : "помощь консьержа")
-    : (serviceType === "housing" ? "housing search" : "concierge assistance");
-  const adminUrl = "https://concierge.green-basket.online/admin";
-  const text = locale === "ru"
-    ? `Поступила новая заявка: ${serviceLabel}.\nID: ${requestId}\nОткройте админ-панель: ${adminUrl}`
-    : `A new request was received: ${serviceLabel}.\nID: ${requestId}\nOpen the admin panel: ${adminUrl}`;
+  const text = buildAdminNotification(request as NotificationRequest, requestId);
 
   let failureCode = "telegram_network_error";
   try {
@@ -505,8 +650,6 @@ const handle = async (req: Request) => {
       const notificationSent = await deliverAdminNotification(
         adminClient,
         existing.id,
-        existing.service_type,
-        existing.locale,
       );
       if (!notificationSent) return response(req, { error: "notification_pending", request_id: existing.id }, 503);
       return response(req, {
@@ -579,8 +722,6 @@ const handle = async (req: Request) => {
           const notificationSent = await deliverAdminNotification(
             adminClient,
             concurrent.id,
-            concurrent.service_type,
-            concurrent.locale,
           );
           if (!notificationSent) return response(req, { error: "notification_pending", request_id: concurrent.id }, 503);
           return response(req, {
@@ -598,8 +739,6 @@ const handle = async (req: Request) => {
     const notificationSent = await deliverAdminNotification(
       adminClient,
       inserted.id,
-      normalized.service_type,
-      normalized.locale,
     );
     if (!notificationSent) return response(req, { error: "notification_pending", request_id: inserted.id }, 503);
 
