@@ -313,75 +313,93 @@ const deliverAdminNotification = async (
 ) => {
   const { data: notification, error: notificationError } = await adminClient
     .from("help_service_notification_outbox")
-    .select("status,attempt_count")
+    .select("status,attempt_count,last_attempt_at")
     .eq("request_id", requestId)
     .maybeSingle();
 
   if (notificationError || !notification) throw notificationError ?? new Error("notification_outbox_missing");
   if (notification.status === "sent") return true;
 
-  const resendApiKey = Deno.env.get("RESEND_API_KEY");
-  const recipient = Deno.env.get("HELP_NOTIFICATION_TO");
-  const sender = Deno.env.get("HELP_NOTIFICATION_FROM");
-  if (!resendApiKey || !recipient || !sender || !EMAIL_RE.test(recipient)) {
+  const botToken = Deno.env.get("TELEGRAM_BOT_TOKEN")?.trim() ?? "";
+  const chatId = Deno.env.get("TELEGRAM_ADMIN_CHAT_ID_2_message")?.trim() ?? "";
+  if (!botToken || !/^-?\d+$/.test(chatId)) {
+    const attemptedAt = new Date().toISOString();
     await adminClient
       .from("help_service_notification_outbox")
       .update({
         attempt_count: notification.attempt_count + 1,
-        last_attempt_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        last_error_code: "notification_config_missing",
+        last_attempt_at: attemptedAt,
+        updated_at: attemptedAt,
+        last_error_code: "telegram_config_missing",
+        status: "pending",
       })
       .eq("request_id", requestId);
     return false;
   }
 
-  const attemptedAt = new Date().toISOString();
-  const { error: attemptError } = await adminClient
+  const attemptedAt = new Date();
+  const staleClaimBefore = new Date(attemptedAt.getTime() - 60_000).toISOString();
+  let claim = adminClient
     .from("help_service_notification_outbox")
     .update({
+      status: "sending",
       attempt_count: notification.attempt_count + 1,
-      last_attempt_at: attemptedAt,
-      updated_at: attemptedAt,
+      last_attempt_at: attemptedAt.toISOString(),
+      updated_at: attemptedAt.toISOString(),
       last_error_code: null,
     })
     .eq("request_id", requestId);
-  if (attemptError) throw attemptError;
+
+  if (notification.status === "pending") {
+    claim = claim.eq("status", "pending");
+  } else if (notification.status === "sending") {
+    if (!notification.last_attempt_at) {
+      claim = claim.eq("status", "sending").is("last_attempt_at", null);
+    } else {
+      if (Date.parse(notification.last_attempt_at) > attemptedAt.getTime() - 60_000) return false;
+      claim = claim.eq("status", "sending").lte("last_attempt_at", staleClaimBefore);
+    }
+  } else {
+    return false;
+  }
+
+  const { data: claimedNotification, error: claimError } = await claim
+    .select("request_id")
+    .maybeSingle();
+  if (claimError) throw claimError;
+  if (!claimedNotification) return false;
 
   const serviceLabel = locale === "ru"
     ? (serviceType === "housing" ? "подбор жилья" : "помощь консьержа")
     : (serviceType === "housing" ? "housing search" : "concierge assistance");
-  const subject = locale === "ru" ? "Новая заявка Green Basket Concierge" : "New Green Basket Concierge request";
   const adminUrl = "https://concierge.green-basket.online/admin";
   const text = locale === "ru"
     ? `Поступила новая заявка: ${serviceLabel}.\nID: ${requestId}\nОткройте админ-панель: ${adminUrl}`
     : `A new request was received: ${serviceLabel}.\nID: ${requestId}\nOpen the admin panel: ${adminUrl}`;
-  const html = `<p>${locale === "ru" ? "Поступила новая заявка" : "A new request was received"}: <strong>${serviceLabel}</strong>.</p><p>ID: <code>${requestId}</code></p><p><a href="${adminUrl}">${locale === "ru" ? "Открыть админ-панель" : "Open the admin panel"}</a></p>`;
 
+  let failureCode = "telegram_network_error";
   try {
-    const providerResponse = await fetch("https://api.resend.com/emails", {
+    const providerResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${resendApiKey}`,
-        "Content-Type": "application/json",
-        "Idempotency-Key": `help-service-request/${requestId}`,
-      },
-      body: JSON.stringify({ from: sender, to: [recipient], subject, text, html }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, text, disable_web_page_preview: true }),
       signal: AbortSignal.timeout(12_000),
     });
 
-    if (!providerResponse.ok) {
-      const providerBody = await providerResponse.json().catch(() => null);
-      const providerCode = isPlainObject(providerBody) && typeof providerBody.name === "string"
-        ? providerBody.name.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 60)
-        : `http_${providerResponse.status}`;
-      throw new Error(`resend_${providerCode || providerResponse.status}`);
+    const providerResult: unknown = await providerResponse.json().catch(() => null);
+    if (!providerResponse.ok || !isPlainObject(providerResult) || providerResult.ok !== true) {
+      failureCode = isPlainObject(providerResult) && typeof providerResult.error_code === "number"
+        ? `telegram_api_${providerResult.error_code}`
+        : `telegram_http_${providerResponse.status}`;
+      throw new Error("telegram_delivery_failed");
     }
 
-    const providerResult: unknown = await providerResponse.json().catch(() => null);
-    const providerMessageId = isPlainObject(providerResult) && typeof providerResult.id === "string"
-      ? providerResult.id.slice(0, 200)
-      : null;
+    const providerMessage = providerResult.result;
+    if (!isPlainObject(providerMessage) || typeof providerMessage.message_id !== "number") {
+      failureCode = "telegram_invalid_response";
+      throw new Error("telegram_invalid_response");
+    }
+
     const sentAt = new Date().toISOString();
     const { error: sentError } = await adminClient
       .from("help_service_notification_outbox")
@@ -389,23 +407,28 @@ const deliverAdminNotification = async (
         status: "sent",
         sent_at: sentAt,
         updated_at: sentAt,
-        provider_message_id: providerMessageId,
+        provider_message_id: `telegram:${providerMessage.message_id}`,
         last_error_code: null,
       })
-      .eq("request_id", requestId);
-    if (sentError) throw sentError;
+      .eq("request_id", requestId)
+      .eq("status", "sending");
+    if (sentError) {
+      failureCode = "notification_state_update_failed";
+      throw new Error("notification_state_update_failed");
+    }
     return true;
   } catch (error) {
-    const errorCode = error instanceof Error
-      ? error.message.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 100)
-      : "notification_delivery_failed";
+    if (failureCode === "telegram_network_error" && error instanceof DOMException && error.name === "TimeoutError") {
+      failureCode = "telegram_timeout";
+    }
     const failedAt = new Date().toISOString();
     const { error: failureUpdateError } = await adminClient
       .from("help_service_notification_outbox")
-      .update({ updated_at: failedAt, last_error_code: errorCode })
-      .eq("request_id", requestId);
+      .update({ status: "pending", updated_at: failedAt, last_error_code: failureCode })
+      .eq("request_id", requestId)
+      .eq("status", "sending");
     if (failureUpdateError) throw failureUpdateError;
-    console.error(JSON.stringify({ request_id: requestId, code: "notification_delivery_failed", provider_code: errorCode }));
+    console.error(JSON.stringify({ request_id: requestId, code: "notification_delivery_failed", provider_code: failureCode }));
     return false;
   }
 };

@@ -16,7 +16,7 @@ Without a configured Concierge project, the page still renders with the approved
 
 Create a separate Supabase project in the Singapore region. Apply every SQL migration in `supabase/migrations/`, deploy `create-help-service-request`, and set the server-only variables listed in `supabase/secrets.example`. Use only this project's URL, anon key, and function deployment.
 
-The request row and notification outbox entry are created together in Postgres. The Edge Function sends a minimal Resend notification to the configured `HELP_NOTIFICATION_TO`; the email contains only the request type, ID, and `/admin` link, not the applicant's contact details or request text. Resend's idempotency key prevents duplicate email sends when the same form submission is retried within its 24-hour retention window. If delivery is temporarily unavailable, the saved request stays in the outbox and the form can retry with its original request key. Verify `notify.green-basket.online` with Resend before using `requests@notify.green-basket.online` as the sender; keep the DNS records for `concierge.green-basket.online` intact.
+The request row and notification outbox entry are created together in Postgres. The Edge Function sends a minimal Telegram notification to the configured group. It includes only the request type, ID, and `/admin` link, not the applicant's contact details or request text. The outbox prevents concurrent sends and retries failed delivery; because Telegram does not support an idempotency key, an uncertain network failure after Telegram accepts a message can still result in a duplicate on a later retry. The saved request remains in the database if notification delivery is temporarily unavailable.
 
 For admin access, create an Auth user in this project. In the Supabase SQL Editor, grant that user the server-controlled role claim using the user's UUID from Authentication → Users:
 
@@ -31,6 +31,6 @@ The admin page is `/admin`. Its list and update RPCs verify this claim in the da
 
 ## Hosting setup
 
-Deploy this directory as a new Vercel project on the account's Hobby plan. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` from the separate Concierge Supabase project in the Vercel project environment. Set the Resend and notification recipient secrets only in the Supabase Edge Function environment, never in Vercel client variables. The Vercel rewrite serves the React app at `/admin` as well as `/`.
+Deploy this directory as a new Vercel project on the account's Hobby plan. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` from the separate Concierge Supabase project in the Vercel project environment. Set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_ADMIN_CHAT_ID_2_message` only in the Supabase Edge Function environment, never in Vercel client variables. The Vercel rewrite serves the React app at `/admin` as well as `/`.
 
 Attach `concierge.green-basket.online` to the new Vercel project. Use the exact CNAME target Vercel provides and add only a `concierge` CNAME record in Porkbun; leave the existing apex and `www` records unchanged. The Concierge site and its database are independent from the Green Basket application.
