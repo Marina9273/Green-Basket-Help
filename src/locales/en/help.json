@@ -84,6 +84,7 @@
     "errorTitle": "We could not save the request",
     "retry": "Try again",
     "newIdempotency": "Start a new request",
+    "notificationPendingTitle": "Request saved",
     "errors": {
       "required": "Please complete this field.",
       "invalid": "Please check this value.",
@@ -94,6 +95,7 @@
       "payload_too_large": "The request is too large.",
       "idempotency_conflict": "This request key was already used for different data. Start a new request.",
       "invalid_session": "The signed-in session is no longer valid. Please sign in again or continue as a guest.",
+      "notification_pending": "Your request was saved, but the email notification is still pending. Select Retry; it will not create a duplicate request.",
       "internal_error": "The request was not saved. Please try again."
     },
     "stayDuration": "Length of stay",

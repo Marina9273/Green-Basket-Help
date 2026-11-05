@@ -285,6 +285,9 @@ const getAuthUserId = async (req: Request, supabaseUrl: string, anonKey: string)
   if (!authorization) return null;
   const token = authorization.replace(/^Bearer\s+/i, "").trim();
   if (!token) throw new Error("invalid_session");
+  // Guest supabase-js clients can put the project's public API key in the
+  // Authorization header. It identifies the project, not an authenticated user.
+  if (token === anonKey || token.startsWith("sb_publishable_")) return null;
 
   const client = createClient(supabaseUrl, anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
   const { data, error } = await client.auth.getUser(token);
@@ -295,11 +298,116 @@ const getAuthUserId = async (req: Request, supabaseUrl: string, anonKey: string)
 const getExistingReceipt = async (adminClient: ReturnType<typeof createClient>, idempotencyKey: string) => {
   const { data, error } = await adminClient
     .from("help_service_requests")
-    .select("id,status,indicative_price_vnd,price_kind,request_fingerprint")
+    .select("id,status,service_type,locale,indicative_price_vnd,price_kind,request_fingerprint")
     .eq("idempotency_key", idempotencyKey)
     .maybeSingle();
   if (error) throw error;
   return data;
+};
+
+const deliverAdminNotification = async (
+  adminClient: ReturnType<typeof createClient>,
+  requestId: string,
+  serviceType: "housing" | "assistance",
+  locale: "en" | "ru",
+) => {
+  const { data: notification, error: notificationError } = await adminClient
+    .from("help_service_notification_outbox")
+    .select("status,attempt_count")
+    .eq("request_id", requestId)
+    .maybeSingle();
+
+  if (notificationError || !notification) throw notificationError ?? new Error("notification_outbox_missing");
+  if (notification.status === "sent") return true;
+
+  const resendApiKey = Deno.env.get("RESEND_API_KEY");
+  const recipient = Deno.env.get("HELP_NOTIFICATION_TO");
+  const sender = Deno.env.get("HELP_NOTIFICATION_FROM");
+  if (!resendApiKey || !recipient || !sender || !EMAIL_RE.test(recipient)) {
+    await adminClient
+      .from("help_service_notification_outbox")
+      .update({
+        attempt_count: notification.attempt_count + 1,
+        last_attempt_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        last_error_code: "notification_config_missing",
+      })
+      .eq("request_id", requestId);
+    return false;
+  }
+
+  const attemptedAt = new Date().toISOString();
+  const { error: attemptError } = await adminClient
+    .from("help_service_notification_outbox")
+    .update({
+      attempt_count: notification.attempt_count + 1,
+      last_attempt_at: attemptedAt,
+      updated_at: attemptedAt,
+      last_error_code: null,
+    })
+    .eq("request_id", requestId);
+  if (attemptError) throw attemptError;
+
+  const serviceLabel = locale === "ru"
+    ? (serviceType === "housing" ? "подбор жилья" : "помощь консьержа")
+    : (serviceType === "housing" ? "housing search" : "concierge assistance");
+  const subject = locale === "ru" ? "Новая заявка Green Basket Concierge" : "New Green Basket Concierge request";
+  const adminUrl = "https://concierge.green-basket.online/admin";
+  const text = locale === "ru"
+    ? `Поступила новая заявка: ${serviceLabel}.\nID: ${requestId}\nОткройте админ-панель: ${adminUrl}`
+    : `A new request was received: ${serviceLabel}.\nID: ${requestId}\nOpen the admin panel: ${adminUrl}`;
+  const html = `<p>${locale === "ru" ? "Поступила новая заявка" : "A new request was received"}: <strong>${serviceLabel}</strong>.</p><p>ID: <code>${requestId}</code></p><p><a href="${adminUrl}">${locale === "ru" ? "Открыть админ-панель" : "Open the admin panel"}</a></p>`;
+
+  try {
+    const providerResponse = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${resendApiKey}`,
+        "Content-Type": "application/json",
+        "Idempotency-Key": `help-service-request/${requestId}`,
+      },
+      body: JSON.stringify({ from: sender, to: [recipient], subject, text, html }),
+      signal: AbortSignal.timeout(12_000),
+    });
+
+    if (!providerResponse.ok) {
+      const providerBody = await providerResponse.json().catch(() => null);
+      const providerCode = isPlainObject(providerBody) && typeof providerBody.name === "string"
+        ? providerBody.name.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 60)
+        : `http_${providerResponse.status}`;
+      throw new Error(`resend_${providerCode || providerResponse.status}`);
+    }
+
+    const providerResult: unknown = await providerResponse.json().catch(() => null);
+    const providerMessageId = isPlainObject(providerResult) && typeof providerResult.id === "string"
+      ? providerResult.id.slice(0, 200)
+      : null;
+    const sentAt = new Date().toISOString();
+    const { error: sentError } = await adminClient
+      .from("help_service_notification_outbox")
+      .update({
+        status: "sent",
+        sent_at: sentAt,
+        updated_at: sentAt,
+        provider_message_id: providerMessageId,
+        last_error_code: null,
+      })
+      .eq("request_id", requestId);
+    if (sentError) throw sentError;
+    return true;
+  } catch (error) {
+    const errorCode = error instanceof Error
+      ? error.message.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 100)
+      : "notification_delivery_failed";
+    const failedAt = new Date().toISOString();
+    const { error: failureUpdateError } = await adminClient
+      .from("help_service_notification_outbox")
+      .update({ updated_at: failedAt, last_error_code: errorCode })
+      .eq("request_id", requestId);
+    if (failureUpdateError) throw failureUpdateError;
+    console.error(JSON.stringify({ request_id: requestId, code: "notification_delivery_failed", provider_code: errorCode }));
+    return false;
+  }
 };
 
 const handle = async (req: Request) => {
@@ -371,9 +479,16 @@ const handle = async (req: Request) => {
       if (existing.request_fingerprint !== requestFingerprint) {
         return response(req, { error: "idempotency_conflict" }, 409);
       }
+      const notificationSent = await deliverAdminNotification(
+        adminClient,
+        existing.id,
+        existing.service_type,
+        existing.locale,
+      );
+      if (!notificationSent) return response(req, { error: "notification_pending", request_id: existing.id }, 503);
       return response(req, {
         request_id: existing.id,
-        status: "new",
+        status: existing.status,
         indicative_price_vnd: existing.indicative_price_vnd,
         price_kind: existing.price_kind,
       }, 200);
@@ -438,9 +553,16 @@ const handle = async (req: Request) => {
       if (insertError.code === "23505") {
         const concurrent = await getExistingReceipt(adminClient, normalized.idempotency_key);
         if (concurrent?.request_fingerprint === requestFingerprint) {
+          const notificationSent = await deliverAdminNotification(
+            adminClient,
+            concurrent.id,
+            concurrent.service_type,
+            concurrent.locale,
+          );
+          if (!notificationSent) return response(req, { error: "notification_pending", request_id: concurrent.id }, 503);
           return response(req, {
             request_id: concurrent.id,
-            status: "new",
+            status: concurrent.status,
             indicative_price_vnd: concurrent.indicative_price_vnd,
             price_kind: concurrent.price_kind,
           }, 200);
@@ -449,6 +571,14 @@ const handle = async (req: Request) => {
       }
       throw insertError;
     }
+
+    const notificationSent = await deliverAdminNotification(
+      adminClient,
+      inserted.id,
+      normalized.service_type,
+      normalized.locale,
+    );
+    if (!notificationSent) return response(req, { error: "notification_pending", request_id: inserted.id }, 503);
 
     return response(req, {
       request_id: inserted.id,
